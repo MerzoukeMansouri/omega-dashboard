@@ -166,9 +166,19 @@ export default function Board() {
 
   if (!data) return <p style={{ padding: 24 }}>loading…</p>;
 
+  // Epics never reach "merged" — they're a pack of stories, not a workflow
+  // item that moves through columns. No `type` field on a story row, but
+  // an epic is exactly any id another row points to via `epic`, so this
+  // needs no schema change: infer it from the shape of the data itself.
+  const epicIds = new Set(data.stories.map((s) => s.epic).filter(Boolean));
+  const epicsById = Object.fromEntries(data.stories.filter((s) => epicIds.has(s.id)).map((s) => [s.id, s]));
+
   // Swimlanes: one row per project, columns are pipeline status within it.
   const byProject = {};
-  for (const s of data.stories) (byProject[s.project_id] ||= []).push(s);
+  for (const s of data.stories) {
+    byProject[s.project_id] ||= [];
+    if (!epicIds.has(s.id)) byProject[s.project_id].push(s); // epics: swimlane header instead, not a column card
+  }
   const projects = Object.keys(byProject).sort();
 
   return (
@@ -196,9 +206,27 @@ export default function Board() {
       {projects.map((project) => {
         const byStatus = Object.fromEntries(COLUMNS.map((c) => [c, []]));
         for (const s of byProject[project]) (byStatus[s.status] ||= []).push(s);
+        const epics = Object.values(epicsById).filter((e) => e.project_id === project);
         return (
           <section key={project} style={{ marginBottom: 24 }}>
             <h2 style={{ fontSize: 13, margin: "0 0 8px", color: "#e5e5e5" }}>{project}</h2>
+            {epics.length > 0 && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                {epics.map((epic) => {
+                  const kids = byProject[project].filter((s) => s.epic === epic.id);
+                  const done = kids.filter((s) => s.status === "merged").length;
+                  return (
+                    <button key={epic.id} onClick={() => openSpec(epic.id)}
+                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px",
+                        background: "#161618", border: "1px solid #2a2a2c", borderRadius: 999,
+                        color: "#aaa", fontSize: 11, cursor: "pointer" }}>
+                      📦 {epic.title}
+                      <span style={{ color: "#666" }}>· {done}/{kids.length} merged</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <div style={{ display: "flex", gap: 12, overflowX: "auto" }}>
               {COLUMNS.map((col) => (
                 <div key={col} style={{ minWidth: 220, flex: "0 0 220px" }}>
