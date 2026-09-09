@@ -73,27 +73,40 @@ function parseStreamLog(raw) {
 function LogEvents({ text }) {
   const events = parseStreamLog(text);
   if (!events.length) return <p style={{ fontSize: 12, color: "#888" }}>(no output yet)</p>;
+  const mono = "ui-monospace, 'SF Mono', Menlo, Consolas, monospace";
   return (
-    <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+    <div style={{ fontSize: 13, lineHeight: 1.6, fontFamily: mono }}>
       {events.map((e, i) => {
-        if (e.kind === "text") return <p key={i} style={{ margin: "6px 0", color: "#ddd", whiteSpace: "pre-wrap" }}>{e.text}</p>;
+        if (e.kind === "text") return (
+          <p key={i} style={{ margin: "10px 0", color: "#e5e5e5", whiteSpace: "pre-wrap" }}>{e.text}</p>
+        );
         if (e.kind === "tool") return (
-          <div key={i} style={{ margin: "4px 0", color: "#60a5fa" }}>
-            🔧 <strong>{e.name}</strong>{e.summary ? <span style={{ color: "#888" }}> — {e.summary}</span> : null}
+          <div key={i} style={{ margin: "6px 0 0", color: "#e5e5e5" }}>
+            <span style={{ color: "#d4a017" }}>⏺</span>{" "}
+            <strong>{e.name}</strong>
+            {e.summary ? <span style={{ color: "#888" }}>({e.summary})</span> : null}
           </div>
         );
-        if (e.kind === "result") return (
-          <pre key={i} style={{ margin: "2px 0 8px 20px", padding: "4px 8px", background: "#1a1a1c",
-            borderRadius: 4, color: e.err ? "#f87171" : "#999", whiteSpace: "pre-wrap", fontSize: 11 }}>
-            {e.text}
-          </pre>
-        );
+        if (e.kind === "result") {
+          const lines = e.text.split("\n");
+          const first = lines[0];
+          const rest = lines.length - 1;
+          return (
+            <div key={i} style={{ margin: "0 0 6px", color: e.err ? "#f87171" : "#666", whiteSpace: "pre-wrap" }}>
+              {"  "}⎿ {first}
+              {rest > 0 && <span style={{ color: "#555" }}> … +{rest} line{rest === 1 ? "" : "s"}</span>}
+            </div>
+          );
+        }
         if (e.kind === "done") return (
-          <div key={i} style={{ margin: "10px 0 0", paddingTop: 8, borderTop: "1px solid #222", color: "#4ade80" }}>
-            ✅ {e.text} {e.ms ? `· ${(e.ms / 1000).toFixed(1)}s` : ""} {e.cost ? `· $${e.cost.toFixed(3)}` : ""}
+          <div key={i} style={{ margin: "14px 0 0", paddingTop: 10, borderTop: "1px solid #222", color: "#4ade80" }}>
+            ● {e.text}
+            <span style={{ color: "#555" }}>
+              {e.ms ? `  ${(e.ms / 1000).toFixed(1)}s` : ""}{e.cost ? `  $${e.cost.toFixed(3)}` : ""}
+            </span>
           </div>
         );
-        return <div key={i} style={{ color: "#555" }}>{e.text}</div>;
+        return <div key={i} style={{ color: "#555", whiteSpace: "pre-wrap" }}>{e.text}</div>;
       })}
     </div>
   );
