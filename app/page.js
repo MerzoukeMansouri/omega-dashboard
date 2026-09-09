@@ -1,8 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import TerminalView from "./Terminal";
+
+// xterm.js touches browser-only globals at import time (`self`, etc.) —
+// must never be evaluated during Next.js's server-side prerender pass.
+const TerminalView = dynamic(() => import("./Terminal"), { ssr: false });
 
 const COLUMNS = [
   "idea", "spec-draft", "spec-validated", "design",
