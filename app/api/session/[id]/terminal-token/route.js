@@ -6,6 +6,8 @@ import crypto from "node:crypto";
 // dashboard/SKILL.md's Terminal section. Never touches DASHBOARD_PASSWORD
 // itself beyond using it as the HMAC key; terminal.py verifies statelessly
 // with the same key, no DB round-trip on its side.
+export const dynamic = "force-dynamic";
+
 export async function GET(_req, { params }) {
   const pool = db();
   const { rows } = await pool.query("select tmux_session from sessions where id = $1", [params.id]);

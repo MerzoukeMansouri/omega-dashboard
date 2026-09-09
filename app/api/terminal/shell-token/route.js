@@ -8,6 +8,11 @@ import crypto from "node:crypto";
 // attach, see dashboard/SKILL.md's Terminal section.
 const SHELL_SESSION = process.env.DASHBOARD_SHELL_SESSION || "omega-shell";
 
+// No per-request input (no DB query, no params) — Next.js would otherwise
+// statically cache this GET route's response forever, freezing the token
+// at whatever timestamp the first request happened to hit.
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const ts = Math.floor(Date.now() / 1000);
   const sig = crypto.createHmac("sha256", process.env.DASHBOARD_PASSWORD)
