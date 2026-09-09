@@ -27,6 +27,7 @@ export async function GET() {
       )) filter (where sess.id is not null and sess.status = 'running'), '[]') as sessions
     from intake_threads t
     left join sessions sess on sess.thread_anchor = t.anchor and sess.status = 'running'
+    where not t.dismissed
     group by t.anchor
     order by t.updated_at desc
   `);

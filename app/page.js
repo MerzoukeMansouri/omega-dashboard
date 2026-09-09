@@ -40,6 +40,11 @@ export default function Board() {
     setLog(j.tail || j.error || "");
   }
 
+  async function dismissIntake(anchor) {
+    setData((d) => ({ ...d, intake: d.intake.filter((t) => t.anchor !== anchor) }));
+    await fetch(`/api/intake/${anchor}`, { method: "DELETE" });
+  }
+
   async function openSpec(storyId) {
     setSpecFor(storyId);
     setSpec({ content: "", loading: true, saving: false, error: "", mode: "preview" });
@@ -63,8 +68,10 @@ export default function Board() {
 
   if (!data) return <p style={{ padding: 24 }}>loading…</p>;
 
-  const byStatus = Object.fromEntries(COLUMNS.map((c) => [c, []]));
-  for (const s of data.stories) (byStatus[s.status] ||= []).push(s);
+  // Swimlanes: one row per project, columns are pipeline status within it.
+  const byProject = {};
+  for (const s of data.stories) (byProject[s.project_id] ||= []).push(s);
+  const projects = Object.keys(byProject).sort();
 
   return (
     <div style={{ padding: "20px 24px" }}>
@@ -81,27 +88,37 @@ export default function Board() {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             {data.intake.map((t) => (
               <Card key={t.anchor} title={t.last_text.slice(0, 80)} sub={`thread ${t.anchor}`}
-                sessions={t.sessions} onOpenLog={openLog} />
+                sessions={t.sessions} onOpenLog={openLog}
+                onDismiss={() => dismissIntake(t.anchor)} />
             ))}
           </div>
         </section>
       )}
 
-      <div style={{ display: "flex", gap: 12, overflowX: "auto" }}>
-        {COLUMNS.map((col) => (
-          <div key={col} style={{ minWidth: 220, flex: "0 0 220px" }}>
-            <h2 style={{ fontSize: 12, textTransform: "uppercase", color: "#888", margin: "0 0 8px" }}>
-              {col} <span style={{ color: "#555" }}>({byStatus[col].length})</span>
-            </h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {byStatus[col].map((s) => (
-                <Card key={s.id} storyId={s.id} title={s.title} sub={s.id} sessions={s.sessions}
-                  onOpenLog={openLog} onOpenSpec={openSpec} />
+      {projects.map((project) => {
+        const byStatus = Object.fromEntries(COLUMNS.map((c) => [c, []]));
+        for (const s of byProject[project]) (byStatus[s.status] ||= []).push(s);
+        return (
+          <section key={project} style={{ marginBottom: 24 }}>
+            <h2 style={{ fontSize: 13, margin: "0 0 8px", color: "#e5e5e5" }}>{project}</h2>
+            <div style={{ display: "flex", gap: 12, overflowX: "auto" }}>
+              {COLUMNS.map((col) => (
+                <div key={col} style={{ minWidth: 220, flex: "0 0 220px" }}>
+                  <h3 style={{ fontSize: 11, textTransform: "uppercase", color: "#888", margin: "0 0 8px", fontWeight: 400 }}>
+                    {col} <span style={{ color: "#555" }}>({byStatus[col].length})</span>
+                  </h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {byStatus[col].map((s) => (
+                      <Card key={s.id} storyId={s.id} title={s.title} sub={s.id} sessions={s.sessions}
+                        onOpenLog={openLog} onOpenSpec={openSpec} />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
-          </div>
-        ))}
-      </div>
+          </section>
+        );
+      })}
 
       {logFor && (
         <Modal onClose={() => setLogFor(null)}>
@@ -180,16 +197,22 @@ function Modal({ children, onClose, wide }) {
   );
 }
 
-function Card({ storyId, title, sub, sessions, onOpenLog, onOpenSpec }) {
+function Card({ storyId, title, sub, sessions, onOpenLog, onOpenSpec, onDismiss }) {
   return (
-    <div style={{ background: "#1a1a1c", border: "1px solid #2a2a2c", borderRadius: 8, padding: 10 }}>
+    <div style={{ background: "#1a1a1c", border: "1px solid #2a2a2c", borderRadius: 8, padding: 10, position: "relative" }}>
+      {onDismiss && (
+        <button onClick={onDismiss} title="dismiss"
+          style={{ position: "absolute", top: 6, right: 6, background: "none", border: 0, color: "#666", cursor: "pointer", fontSize: 13, lineHeight: 1, padding: 2 }}>
+          ×
+        </button>
+      )}
       {storyId ? (
         <button onClick={() => onOpenSpec(storyId)}
-          style={{ display: "block", textAlign: "left", background: "none", border: 0, color: "#e5e5e5", padding: 0, cursor: "pointer", fontSize: 13, marginBottom: 4 }}>
+          style={{ display: "block", textAlign: "left", background: "none", border: 0, color: "#e5e5e5", padding: 0, cursor: "pointer", fontSize: 13, marginBottom: 4, paddingRight: onDismiss ? 16 : 0 }}>
           {title}
         </button>
       ) : (
-        <div style={{ fontSize: 13, marginBottom: 4 }}>{title}</div>
+        <div style={{ fontSize: 13, marginBottom: 4, paddingRight: onDismiss ? 16 : 0 }}>{title}</div>
       )}
       <div style={{ fontSize: 11, color: "#777", marginBottom: sessions.length ? 6 : 0 }}>{sub}</div>
       {sessions.map((sess) => (
