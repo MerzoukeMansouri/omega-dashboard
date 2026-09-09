@@ -28,6 +28,7 @@ export default function Board() {
   const [termFor, setTermFor] = useState(null); // session id
   const [specFor, setSpecFor] = useState(null); // story id
   const [spec, setSpec] = useState({ content: "", loading: false, saving: false, error: "", mode: "preview" });
+  const [gate, setGate] = useState({ text: "", sending: false, error: "", sent: false });
 
   useEffect(() => {
     async function load() {
@@ -54,10 +55,23 @@ export default function Board() {
   async function openSpec(storyId) {
     setSpecFor(storyId);
     setSpec({ content: "", loading: true, saving: false, error: "", mode: "preview" });
+    setGate({ text: "", sending: false, error: "", sent: false });
     const res = await fetch(`/api/story/${storyId}`);
     const j = await res.json();
     if (!res.ok) setSpec({ content: "", loading: false, saving: false, error: j.error || "failed to load", mode: "preview" });
     else setSpec({ content: j.content || "", loading: false, saving: false, error: "", mode: "preview" });
+  }
+
+  async function sendGate() {
+    setGate((g) => ({ ...g, sending: true, error: "" }));
+    const res = await fetch(`/api/story/${specFor}/gate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: gate.text }),
+    });
+    const j = await res.json();
+    if (!res.ok) setGate((g) => ({ ...g, sending: false, error: j.error || "send failed" }));
+    else setGate({ text: "", sending: false, error: "", sent: true });
   }
 
   async function saveSpec() {
@@ -184,6 +198,25 @@ export default function Board() {
               style={{ width: "100%", height: "60vh", background: "#111", color: "#ddd", border: "1px solid #333",
                 borderRadius: 6, padding: 10, fontFamily: "ui-monospace, monospace", fontSize: 12, resize: "vertical" }} />
           )}
+
+          <div style={{ marginTop: 12, borderTop: "1px solid #2a2a2c", paddingTop: 10 }}>
+            <label style={{ fontSize: 11, color: "#888", textTransform: "uppercase", display: "block", marginBottom: 6 }}>
+              Gate comment — approve / request changes / free-text
+            </label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input value={gate.text} onChange={(e) => setGate((g) => ({ ...g, text: e.target.value, sent: false }))}
+                onKeyDown={(e) => e.key === "Enter" && gate.text.trim() && !gate.sending && sendGate()}
+                placeholder='e.g. "approved" or "change the retry limit to 3"'
+                style={{ flex: 1, background: "#111", color: "#ddd", border: "1px solid #333", borderRadius: 6, padding: "7px 10px", fontSize: 12 }} />
+              <button onClick={sendGate} disabled={!gate.text.trim() || gate.sending}
+                style={{ padding: "6px 14px", background: "#2563eb", color: "#fff", border: 0, borderRadius: 6,
+                  cursor: gate.text.trim() ? "pointer" : "default", fontSize: 12, opacity: gate.text.trim() ? 1 : 0.5 }}>
+                {gate.sending ? "sending…" : "send"}
+              </button>
+            </div>
+            {gate.error && <p style={{ fontSize: 12, color: "#f87171", margin: "6px 0 0" }}>{gate.error}</p>}
+            {gate.sent && <p style={{ fontSize: 12, color: "#4ade80", margin: "6px 0 0" }}>sent — dispatching a session to act on it, check the card in a moment</p>}
+          </div>
         </Modal>
       )}
 
