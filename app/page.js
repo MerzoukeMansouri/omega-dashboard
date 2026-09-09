@@ -26,7 +26,6 @@ const LiveLog = dynamic(() => import("./LiveLog"), { ssr: false });
 export default function Board() {
   const [data, setData] = useState(null);
   const [logFor, setLogFor] = useState(null); // session id — live via WS, see LiveLog
-  const [termFor, setTermFor] = useState(null); // session id
   const [runningOpen, setRunningOpen] = useState(false);
   const [specFor, setSpecFor] = useState(null); // story id
   const [spec, setSpec] = useState({ content: "", loading: false, saving: false, error: "", mode: "preview" });
@@ -128,8 +127,6 @@ export default function Board() {
                 </span>
                 <button onClick={() => { openLog(sess.id); setRunningOpen(false); }} title="log"
                   style={{ background: "none", border: 0, color: "#60a5fa", cursor: "pointer", fontSize: 12 }}>📄</button>
-                <button onClick={() => { setTermFor(sess.id); setRunningOpen(false); }} title="terminal"
-                  style={{ background: "none", border: 0, color: "#888", cursor: "pointer", fontSize: 12 }}>🖥</button>
               </div>
             ))}
           </div>
@@ -142,7 +139,7 @@ export default function Board() {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             {data.intake.map((t) => (
               <Card key={t.anchor} title={t.last_text.slice(0, 80)} sub={`thread ${t.anchor}`}
-                sessions={t.sessions} onOpenLog={openLog} onOpenTerminal={setTermFor}
+                sessions={t.sessions} onOpenLog={openLog}
                 onDismiss={() => dismissIntake(t.anchor)} />
             ))}
           </div>
@@ -182,7 +179,7 @@ export default function Board() {
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {byStatus[col].map((s) => (
                       <Card key={s.id} storyId={s.id} title={s.title} sub={s.id} sessions={s.sessions}
-                        onOpenLog={openLog} onOpenSpec={openSpec} onOpenTerminal={setTermFor} />
+                        onOpenLog={openLog} onOpenSpec={openSpec} />
                     ))}
                   </div>
                 </div>
@@ -272,11 +269,6 @@ export default function Board() {
         </Modal>
       )}
 
-      {termFor && (
-        <TerminalView tokenUrl={`/api/session/${termFor}/terminal-token`}
-          title={`terminal — session ${termFor}`} onClose={() => setTermFor(null)} />
-      )}
-
       <ShellDock />
     </div>
   );
@@ -315,7 +307,7 @@ function Modal({ children, onClose, wide }) {
   );
 }
 
-function Card({ storyId, title, sub, sessions, onOpenLog, onOpenSpec, onOpenTerminal, onDismiss }) {
+function Card({ storyId, title, sub, sessions, onOpenLog, onOpenSpec, onDismiss }) {
   return (
     <div style={{ background: "#1a1a1c", border: "1px solid #2a2a2c", borderRadius: 8, padding: 10, position: "relative" }}>
       {onDismiss && (
@@ -334,16 +326,15 @@ function Card({ storyId, title, sub, sessions, onOpenLog, onOpenSpec, onOpenTerm
       )}
       <div style={{ fontSize: 11, color: "#777", marginBottom: sessions.length ? 6 : 0 }}>{sub}</div>
       {sessions.map((sess) => (
-        <div key={sess.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button onClick={() => onOpenLog(sess.id)}
-            style={{ flex: 1, textAlign: "left", fontSize: 11, color: "#4ade80", background: "none", border: 0, padding: "2px 0", cursor: "pointer" }}>
-            🟢 {sess.kind} · pid {sess.pid}
-          </button>
-          <button onClick={() => onOpenTerminal(sess.id)} title="attach terminal"
-            style={{ fontSize: 11, color: "#888", background: "none", border: 0, cursor: "pointer", padding: "2px 4px" }}>
-            🖥
-          </button>
-        </div>
+        // No terminal-attach button here — a claude -p dispatch's pty is
+        // empty by design (output goes straight to its log file, and it
+        // isn't reading stdin either), so there's nothing to attach to.
+        // The live log (LiveLog, mode=log) is the thing that actually
+        // shows this session's real content; see terminal.py's tail_file.
+        <button key={sess.id} onClick={() => onOpenLog(sess.id)}
+          style={{ display: "block", width: "100%", textAlign: "left", fontSize: 11, color: "#4ade80", background: "none", border: 0, padding: "2px 0", cursor: "pointer" }}>
+          🟢 {sess.kind} · pid {sess.pid}
+        </button>
       ))}
     </div>
   );
