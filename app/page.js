@@ -220,7 +220,32 @@ export default function Board() {
         </Modal>
       )}
 
-      {termFor && <TerminalView sessionId={termFor} onClose={() => setTermFor(null)} />}
+      {termFor && (
+        <TerminalView tokenUrl={`/api/session/${termFor}/terminal-token`}
+          title={`terminal — session ${termFor}`} onClose={() => setTermFor(null)} />
+      )}
+
+      <ShellDock />
+    </div>
+  );
+}
+
+function ShellDock() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 40 }}>
+      {open ? (
+        <div style={{ height: "40vh", background: "#0a0a0a", borderTop: "1px solid #222" }}>
+          <TerminalView tokenUrl="/api/terminal/shell-token" title="server shell" dock
+            onClose={() => setOpen(false)} />
+        </div>
+      ) : (
+        <button onClick={() => setOpen(true)}
+          style={{ display: "block", width: "100%", padding: "6px 12px", background: "#151516",
+            border: 0, borderTop: "1px solid #222", color: "#888", fontSize: 12, textAlign: "left", cursor: "pointer" }}>
+          ▸ terminal
+        </button>
+      )}
     </div>
   );
 }
