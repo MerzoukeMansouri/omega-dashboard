@@ -102,12 +102,12 @@ export default function Board() {
   }
   const projects = Object.keys(byProject).sort();
 
-  // Flatten every running session out of the cards that already carry
-  // them — no separate API call, this is exactly the data rendered below.
-  const runningSessions = [
-    ...data.stories.flatMap((s) => s.sessions.map((sess) => ({ ...sess, label: s.title }))),
-    ...data.intake.flatMap((t) => t.sessions.map((sess) => ({ ...sess, label: t.last_text.slice(0, 60) }))),
-  ];
+  // From the API directly, not derived from card data — a plan/retro
+  // session (events.py's steps 5/7/8) never attaches to any story or
+  // intake card (no single story id to key on), so it would be invisible
+  // here despite counting toward runningCount if this were built by
+  // flattening the cards below instead.
+  const runningSessions = data.runningSessions || [];
 
   return (
     <div style={{ padding: "20px 24px" }} onClick={() => runningOpen && setRunningOpen(false)}>

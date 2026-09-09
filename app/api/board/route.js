@@ -32,12 +32,27 @@ export async function GET() {
     order by t.updated_at desc
   `);
 
-  const runningCount = await pool.query(`select count(*)::int as n from sessions where status = 'running'`);
+  // Authoritative list — every running session, regardless of whether it
+  // attaches to a story/intake card. plan/retro dispatches (events.py's
+  // steps 5/7/8) never do: their prompt carries multiple candidate
+  // stories or a PR, not one story id, so story_id is always null for
+  // them. Deriving the header's session list from the cards above missed
+  // them entirely (visible in the count, invisible everywhere else) —
+  // this is the fix, query sessions directly instead.
+  const running = await pool.query(`
+    select sess.id, sess.pid, sess.kind, sess.started_at,
+      coalesce(s.title, sess.thread_anchor, sess.kind) as label
+    from sessions sess
+    left join stories s on s.id = sess.story_id
+    where sess.status = 'running'
+    order by sess.started_at desc
+  `);
 
   return NextResponse.json({
     stories: stories.rows,
     intake: intake.rows,
-    runningCount: runningCount.rows[0].n,
+    runningSessions: running.rows,
+    runningCount: running.rows.length,
     generatedAt: new Date().toISOString(),
   });
 }
