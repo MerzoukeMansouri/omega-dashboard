@@ -21,6 +21,84 @@ function withoutFrontmatter(text) {
   return end === -1 ? text : text.slice(end + 4).replace(/^\s+/, "");
 }
 
+// Log content is claude -p --output-format stream-json output (one JSON
+// event per line — see runtime/events.py / telegram.sh's run_*_in_tmux).
+// Only render the settled events (assistant/user/result); stream_event
+// carries the same content again as incremental deltas, would double it up.
+const TOOL_SUMMARY = {
+  Bash: (i) => i.command,
+  Read: (i) => i.file_path,
+  Write: (i) => i.file_path,
+  Edit: (i) => i.file_path,
+  Grep: (i) => i.pattern,
+  Glob: (i) => i.pattern,
+};
+
+function summarizeInput(name, input) {
+  const f = TOOL_SUMMARY[name];
+  const s = f ? f(input) : JSON.stringify(input);
+  return s && s.length > 140 ? s.slice(0, 140) + "…" : s;
+}
+
+function toolResultText(content) {
+  const text = typeof content === "string" ? content : JSON.stringify(content);
+  return text.length > 600 ? text.slice(0, 600) + "…" : text;
+}
+
+function parseStreamLog(raw) {
+  const events = [];
+  for (const line of raw.split("\n")) {
+    const t = line.trim();
+    if (!t) continue;
+    let d;
+    try { d = JSON.parse(t); } catch { events.push({ kind: "raw", text: t }); continue; }
+
+    if (d.type === "assistant") {
+      for (const block of d.message?.content || []) {
+        if (block.type === "text" && block.text) events.push({ kind: "text", text: block.text });
+        else if (block.type === "tool_use") events.push({ kind: "tool", name: block.name, summary: summarizeInput(block.name, block.input) });
+      }
+    } else if (d.type === "user") {
+      for (const block of d.message?.content || []) {
+        if (block.type === "tool_result") events.push({ kind: "result", text: toolResultText(block.content), err: !!block.is_error });
+      }
+    } else if (d.type === "result") {
+      events.push({ kind: "done", text: d.result || d.stop_reason || "finished", cost: d.total_cost_usd, ms: d.duration_api_ms });
+    }
+    // system/status, rate_limit_event, stream_event: not shown — noise or duplicate.
+  }
+  return events;
+}
+
+function LogEvents({ text }) {
+  const events = parseStreamLog(text);
+  if (!events.length) return <p style={{ fontSize: 12, color: "#888" }}>(no output yet)</p>;
+  return (
+    <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+      {events.map((e, i) => {
+        if (e.kind === "text") return <p key={i} style={{ margin: "6px 0", color: "#ddd", whiteSpace: "pre-wrap" }}>{e.text}</p>;
+        if (e.kind === "tool") return (
+          <div key={i} style={{ margin: "4px 0", color: "#60a5fa" }}>
+            🔧 <strong>{e.name}</strong>{e.summary ? <span style={{ color: "#888" }}> — {e.summary}</span> : null}
+          </div>
+        );
+        if (e.kind === "result") return (
+          <pre key={i} style={{ margin: "2px 0 8px 20px", padding: "4px 8px", background: "#1a1a1c",
+            borderRadius: 4, color: e.err ? "#f87171" : "#999", whiteSpace: "pre-wrap", fontSize: 11 }}>
+            {e.text}
+          </pre>
+        );
+        if (e.kind === "done") return (
+          <div key={i} style={{ margin: "10px 0 0", paddingTop: 8, borderTop: "1px solid #222", color: "#4ade80" }}>
+            ✅ {e.text} {e.ms ? `· ${(e.ms / 1000).toFixed(1)}s` : ""} {e.cost ? `· $${e.cost.toFixed(3)}` : ""}
+          </div>
+        );
+        return <div key={i} style={{ color: "#555" }}>{e.text}</div>;
+      })}
+    </div>
+  );
+}
+
 export default function Board() {
   const [data, setData] = useState(null);
   const [logFor, setLogFor] = useState(null);
@@ -141,8 +219,8 @@ export default function Board() {
       })}
 
       {logFor && (
-        <Modal onClose={() => setLogFor(null)}>
-          <pre style={{ margin: 0, fontSize: 12, whiteSpace: "pre-wrap" }}>{log}</pre>
+        <Modal onClose={() => setLogFor(null)} wide>
+          <LogEvents text={log} />
         </Modal>
       )}
 
