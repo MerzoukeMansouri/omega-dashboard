@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import TerminalView from "./Terminal";
 
 const COLUMNS = [
   "idea", "spec-draft", "spec-validated", "design",
@@ -20,6 +21,7 @@ export default function Board() {
   const [data, setData] = useState(null);
   const [logFor, setLogFor] = useState(null);
   const [log, setLog] = useState("");
+  const [termFor, setTermFor] = useState(null); // session id
   const [specFor, setSpecFor] = useState(null); // story id
   const [spec, setSpec] = useState({ content: "", loading: false, saving: false, error: "", mode: "preview" });
 
@@ -88,7 +90,7 @@ export default function Board() {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             {data.intake.map((t) => (
               <Card key={t.anchor} title={t.last_text.slice(0, 80)} sub={`thread ${t.anchor}`}
-                sessions={t.sessions} onOpenLog={openLog}
+                sessions={t.sessions} onOpenLog={openLog} onOpenTerminal={setTermFor}
                 onDismiss={() => dismissIntake(t.anchor)} />
             ))}
           </div>
@@ -110,7 +112,7 @@ export default function Board() {
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {byStatus[col].map((s) => (
                       <Card key={s.id} storyId={s.id} title={s.title} sub={s.id} sessions={s.sessions}
-                        onOpenLog={openLog} onOpenSpec={openSpec} />
+                        onOpenLog={openLog} onOpenSpec={openSpec} onOpenTerminal={setTermFor} />
                     ))}
                   </div>
                 </div>
@@ -180,6 +182,8 @@ export default function Board() {
           )}
         </Modal>
       )}
+
+      {termFor && <TerminalView sessionId={termFor} onClose={() => setTermFor(null)} />}
     </div>
   );
 }
@@ -197,7 +201,7 @@ function Modal({ children, onClose, wide }) {
   );
 }
 
-function Card({ storyId, title, sub, sessions, onOpenLog, onOpenSpec, onDismiss }) {
+function Card({ storyId, title, sub, sessions, onOpenLog, onOpenSpec, onOpenTerminal, onDismiss }) {
   return (
     <div style={{ background: "#1a1a1c", border: "1px solid #2a2a2c", borderRadius: 8, padding: 10, position: "relative" }}>
       {onDismiss && (
@@ -216,10 +220,16 @@ function Card({ storyId, title, sub, sessions, onOpenLog, onOpenSpec, onDismiss 
       )}
       <div style={{ fontSize: 11, color: "#777", marginBottom: sessions.length ? 6 : 0 }}>{sub}</div>
       {sessions.map((sess) => (
-        <button key={sess.id} onClick={() => onOpenLog(sess.id)}
-          style={{ display: "block", width: "100%", textAlign: "left", fontSize: 11, color: "#4ade80", background: "none", border: 0, padding: "2px 0", cursor: "pointer" }}>
-          🟢 {sess.kind} · pid {sess.pid}
-        </button>
+        <div key={sess.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button onClick={() => onOpenLog(sess.id)}
+            style={{ flex: 1, textAlign: "left", fontSize: 11, color: "#4ade80", background: "none", border: 0, padding: "2px 0", cursor: "pointer" }}>
+            🟢 {sess.kind} · pid {sess.pid}
+          </button>
+          <button onClick={() => onOpenTerminal(sess.id)} title="attach terminal"
+            style={{ fontSize: 11, color: "#888", background: "none", border: 0, cursor: "pointer", padding: "2px 4px" }}>
+            🖥
+          </button>
+        </div>
       ))}
     </div>
   );
