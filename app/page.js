@@ -27,6 +27,7 @@ export default function Board() {
   const [data, setData] = useState(null);
   const [logFor, setLogFor] = useState(null); // session id — live via WS, see LiveLog
   const [termFor, setTermFor] = useState(null); // session id
+  const [runningOpen, setRunningOpen] = useState(false);
   const [specFor, setSpecFor] = useState(null); // story id
   const [spec, setSpec] = useState({ content: "", loading: false, saving: false, error: "", mode: "preview" });
   const [gate, setGate] = useState({ text: "", sending: false, error: "", sent: false });
@@ -101,13 +102,38 @@ export default function Board() {
   }
   const projects = Object.keys(byProject).sort();
 
+  // Flatten every running session out of the cards that already carry
+  // them — no separate API call, this is exactly the data rendered below.
+  const runningSessions = [
+    ...data.stories.flatMap((s) => s.sessions.map((sess) => ({ ...sess, label: s.title }))),
+    ...data.intake.flatMap((t) => t.sessions.map((sess) => ({ ...sess, label: t.last_text.slice(0, 60) }))),
+  ];
+
   return (
-    <div style={{ padding: "20px 24px" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 16 }}>
+    <div style={{ padding: "20px 24px" }} onClick={() => runningOpen && setRunningOpen(false)}>
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 16, position: "relative" }}>
         <h1 style={{ fontSize: 16, margin: 0 }}>omega — pipeline board</h1>
-        <span style={{ fontSize: 12, color: "#888" }}>
-          🟢 {data.runningCount} session{data.runningCount === 1 ? "" : "s"} running
-        </span>
+        <button onClick={() => setRunningOpen((v) => !v)}
+          style={{ fontSize: 12, color: "#888", background: "none", border: 0, cursor: "pointer", padding: 0 }}>
+          🟢 {data.runningCount} session{data.runningCount === 1 ? "" : "s"} running {data.runningCount > 0 ? (runningOpen ? "▴" : "▾") : ""}
+        </button>
+        {runningOpen && data.runningCount > 0 && (
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ position: "absolute", top: "100%", right: 0, marginTop: 6, background: "#1a1a1c",
+              border: "1px solid #2a2a2c", borderRadius: 8, padding: 8, zIndex: 30, minWidth: 260 }}>
+            {runningSessions.map((sess) => (
+              <div key={sess.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 6px" }}>
+                <span style={{ fontSize: 11, color: "#e5e5e5", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {sess.kind} · {sess.label}
+                </span>
+                <button onClick={() => { openLog(sess.id); setRunningOpen(false); }} title="log"
+                  style={{ background: "none", border: 0, color: "#60a5fa", cursor: "pointer", fontSize: 12 }}>📄</button>
+                <button onClick={() => { setTermFor(sess.id); setRunningOpen(false); }} title="terminal"
+                  style={{ background: "none", border: 0, color: "#888", cursor: "pointer", fontSize: 12 }}>🖥</button>
+              </div>
+            ))}
+          </div>
+        )}
       </header>
 
       {data.intake.length > 0 && (

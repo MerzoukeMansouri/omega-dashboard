@@ -4,13 +4,16 @@ import { LogEvents } from "./logFormat";
 
 // ponytail: strips tmux's terminal-control escape codes (CSI/OSC/charset
 // sequences) with a regex rather than a real terminal emulator — good
-// enough for a log view (content is a plain scrolling JSON stream, only
-// the initial attach sends a full-screen redraw), not pixel-perfect.
-// Upgrade to a proper ANSI parser if a redraw ever visibly scrambles output.
+// enough for a log view (content is a plain scrolling JSON stream) now
+// that terminal.py turns the status bar off (it was drawn via absolute
+// cursor positioning interleaved with real content — after stripping,
+// that glued status-bar text directly onto JSON lines with no line
+// break, corrupting them). Upgrade to a proper ANSI parser if a redraw
+// ever visibly scrambles output some other way.
 function stripAnsi(s) {
   return s
     .replace(/\x1b\][^\x07]*(\x07|\x1b\\)/g, "")
-    .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
+    .replace(/\x1b\[[0-9;:<=>?]*[a-zA-Z]/g, "")
     .replace(/\x1b[()][0-9A-Za-z]/g, "")
     .replace(/\x1b[=>]/g, "");
 }
