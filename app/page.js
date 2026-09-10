@@ -30,6 +30,7 @@ export default function Board() {
   const [specFor, setSpecFor] = useState(null); // story id
   const [spec, setSpec] = useState({ content: "", loading: false, saving: false, error: "", mode: "preview" });
   const [gate, setGate] = useState({ text: "", sending: false, error: "", sent: false });
+  const [events, setEvents] = useState([]); // this story's event timeline, polled live while open
 
   useEffect(() => {
     async function load() {
@@ -54,11 +55,27 @@ export default function Board() {
     setSpecFor(storyId);
     setSpec({ content: "", loading: true, saving: false, error: "", mode: "preview" });
     setGate({ text: "", sending: false, error: "", sent: false });
+    setEvents([]);
     const res = await fetch(`/api/story/${storyId}`);
     const j = await res.json();
     if (!res.ok) setSpec({ content: "", loading: false, saving: false, error: j.error || "failed to load", mode: "preview" });
     else setSpec({ content: j.content || "", loading: false, saving: false, error: "", mode: "preview" });
+    loadEvents(storyId);
   }
+
+  async function loadEvents(storyId) {
+    const res = await fetch(`/api/story/${storyId}/events`);
+    if (res.ok) setEvents((await res.json()).events);
+  }
+
+  // Live while the panel is open — real bus events only, no synthetic
+  // entries for still-legacy (not-yet-event-driven) steps, so an empty
+  // list here honestly means "nothing on the event bus yet for this story".
+  useEffect(() => {
+    if (!specFor) return;
+    const t = setInterval(() => loadEvents(specFor), 5000);
+    return () => clearInterval(t);
+  }, [specFor]);
 
   async function sendGate() {
     setGate((g) => ({ ...g, sending: true, error: "" }));
@@ -246,6 +263,31 @@ export default function Board() {
             <textarea value={spec.content} onChange={(e) => setSpec((s) => ({ ...s, content: e.target.value }))}
               style={{ width: "100%", height: "60vh", background: "#111", color: "#ddd", border: "1px solid #333",
                 borderRadius: 6, padding: 10, fontFamily: "ui-monospace, monospace", fontSize: 12, resize: "vertical" }} />
+          )}
+
+          {events.length > 0 && (
+            <div style={{ marginTop: 12, borderTop: "1px solid #2a2a2c", paddingTop: 10 }}>
+              <label style={{ fontSize: 11, color: "#888", textTransform: "uppercase", display: "block", marginBottom: 6 }}>
+                Event timeline
+              </label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 160, overflow: "auto" }}>
+                {events.map((e) => (
+                  <div key={e.id} style={{ display: "flex", gap: 8, alignItems: "baseline", fontSize: 11 }}>
+                    <span style={{ color: e.status === "failed" ? "#f87171" : "#777", minWidth: 90 }}>
+                      {new Date(e.updated_at).toLocaleString()}
+                    </span>
+                    <span style={{ color: e.status === "failed" ? "#f87171" : "#4ade80" }}>
+                      {e.status === "failed" ? "✕" : "✓"} {e.kind}
+                    </span>
+                    {e.status === "failed" && e.error && (
+                      <span style={{ color: "#f87171", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        — {e.error}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           <div style={{ marginTop: 12, borderTop: "1px solid #2a2a2c", paddingTop: 10 }}>
